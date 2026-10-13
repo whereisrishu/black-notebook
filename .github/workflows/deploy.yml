@@ -1,0 +1,59 @@
+name: Deploy Black Notebook
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare static site
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Set the SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY repository variables before deploying." >&2
+            exit 1
+          fi
+          mkdir -p site/src
+          cp index.html site/index.html
+          cp -R src/. site/src/
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const config = {
+            supabaseUrl: process.env.SUPABASE_URL,
+            supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
+          };
+          writeFileSync('site/public-config.js', `window.BLACK_NOTEBOOK_CONFIG = ${JSON.stringify(config)};\n`);
+          NODE
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
