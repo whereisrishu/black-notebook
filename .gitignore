@@ -1,0 +1,8 @@
+.worktrees/
+node_modules/
+dist/
+.env
+.env.*
+black-notebook-backup*.json
+*.backup.json
+
